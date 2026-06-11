@@ -47,7 +47,14 @@ void Cube::capToBudget() {
     }
     uint32_t channelMa = channelSum * LED_CHANNEL_FULL_MA / 255;
     uint32_t idleMa = (uint32_t)_strip.numPixels() * LED_IDLE_MA;
-    if (channelMa == 0 || idleMa + channelMa <= LED_BUDGET_MA) {
+    uint32_t drawMa = idleMa + channelMa;
+
+    if (channelMa == 0 || drawMa <= LED_BUDGET_MA) {
+        if (_capActive) {  // dropped back under budget — log the release once
+            Serial.printf("[PWR] cap released: %lu mA within %lu mA budget\n",
+                          (unsigned long)drawMa, (unsigned long)LED_BUDGET_MA);
+            _capActive = false;
+        }
         return;  // nothing lit, or already within budget
     }
 
@@ -58,12 +65,21 @@ void Cube::capToBudget() {
         buf[i] = (uint16_t)(buf[i] * scale) >> 8;
     }
 
+    // Edge-triggered logging: a guaranteed line the instant the cap engages,
+    // then a 1 Hz heartbeat while it stays active (show() runs many times/sec,
+    // so an un-throttled log would flood the monitor).
     uint32_t now = millis();
-    if (now - _lastCapLogMs >= 1000) {
+    if (!_capActive) {
+        Serial.printf("[PWR] cap ENGAGED: %lu mA -> %lu mA budget (channels %lu%%)\n",
+                      (unsigned long)drawMa, (unsigned long)LED_BUDGET_MA,
+                      (unsigned long)(scale * 100 / 256));
+        _capActive = true;
         _lastCapLogMs = now;
-        Serial.printf("power cap: %lu mA -> %u mA budget (scale %lu/256)\n",
-                      (unsigned long)(idleMa + channelMa), LED_BUDGET_MA,
-                      (unsigned long)scale);
+    } else if (now - _lastCapLogMs >= 1000) {
+        Serial.printf("[PWR] capping: %lu mA -> %lu mA budget (channels %lu%%)\n",
+                      (unsigned long)drawMa, (unsigned long)LED_BUDGET_MA,
+                      (unsigned long)(scale * 100 / 256));
+        _lastCapLogMs = now;
     }
 }
 

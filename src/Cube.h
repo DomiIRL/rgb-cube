@@ -53,7 +53,8 @@ public:
 
 private:
     Adafruit_NeoPixel _strip;
-    uint32_t _lastCapLogMs = 0;  // throttles the "power-capped" Serial notice
+    bool     _capActive   = false;  // true while the power cap is clamping frames
+    uint32_t _lastCapLogMs = 0;     // throttles the "still capping" Serial heartbeat
     // Scales the frame down in place so its draw fits LED_BUDGET_MA.
     void capToBudget();
     static int coordToIndex(int x, int y, int z);
