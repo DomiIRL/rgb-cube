@@ -6,10 +6,9 @@ namespace {
 constexpr int CHAR_W = 3;       // glyph width in pixels
 constexpr int CHAR_H = 5;       // glyph height in pixels
 constexpr int ADVANCE = 4;      // CHAR_W + 1 column gap between glyphs
-constexpr int Z_BASE = 1;       // bottom row sits one pixel up from the z=0 edge
+constexpr int H_BASE = 1;       // bottom row sits one pixel up from the y=0 edge
 constexpr uint32_t STEP_MS = 110;    // ms per one-column scroll step
 constexpr uint32_t STATIC_MS = 900;  // how long a non-scrolling label is held
-constexpr uint8_t VAL = 200;         // brightness
 
 // Compact 3x5 font, rows top->bottom, 3 bits per row (bit2 = leftmost column).
 // Digits use a clean seven-segment style. Order: 0-9, A-Z, space at index 36.
@@ -60,6 +59,20 @@ int glyphIndex(char c) {
     return 36; // space / unknown
 }
 
+// Lights one pixel on a given vertical face. `vx` is the reading column
+// (already globally flipped by the caller so the text isn't mirrored on this
+// cube's wiring) and `vy` is the height row (0 = bottom). The four faces are
+// wound around the cube so the glyph reads upright from each side.
+void setFacePixel(Cube& cube, int face, int vx, int vy, uint32_t color) {
+    const int hi = CUBE_X - 1;  // faces are square (CUBE_X == CUBE_Z)
+    switch (face) {
+        case 0: cube.setPixel(vx,      vy, 0,       color); break; // front (z = 0)
+        case 1: cube.setPixel(hi,      vy, vx,      color); break; // right (x = max)
+        case 2: cube.setPixel(hi - vx, vy, hi,      color); break; // back  (z = max)
+        case 3: cube.setPixel(0,       vy, hi - vx, color); break; // left  (x = 0)
+    }
+}
+
 }  // namespace
 
 const uint8_t* TextScroll::glyphFor(char c) {
@@ -67,21 +80,24 @@ const uint8_t* TextScroll::glyphFor(char c) {
 }
 
 void TextScroll::drawFrame(Cube& cube) const {
-    const int y = CUBE_Y - 1;  // top layer
-    const uint32_t color = Cube::colorRGB(VAL, VAL, VAL);
+    const uint32_t color = _color;
     cube.clear();
     for (int i = 0; i < _len; i++) {
         const uint8_t* g = glyphFor(_text[i]);
-        int charX = _scrollX + i * ADVANCE;       // viewer x of this glyph's left col
+        int charX = _scrollX + i * ADVANCE;        // viewer column of this glyph's left edge
         for (int col = 0; col < CHAR_W; col++) {
-            int vx = charX + col;                  // viewer x of this column
+            int vx = charX + col;                  // viewer column on each face
             if (vx < 0 || vx >= CUBE_X) {
                 continue;
             }
-            int x = (CUBE_X - 1) - vx;              // single global flip corrects the mirror
+            int fx = (CUBE_X - 1) - vx;            // global flip: the cube reads mirrored otherwise
             for (int r = 0; r < CHAR_H; r++) {
                 if (g[r] & (1 << (CHAR_W - 1 - col))) {
-                    cube.setPixel(x, y, Z_BASE + (CHAR_H - 1 - r), color);
+                    int vy = H_BASE + (CHAR_H - 1 - r);  // height; glyph row 0 is its top
+                    // same glyph painted on all four vertical faces at once
+                    for (int f = 0; f < 4; f++) {
+                        setFacePixel(cube, f, fx, vy, color);
+                    }
                 }
             }
         }
@@ -89,7 +105,8 @@ void TextScroll::drawFrame(Cube& cube) const {
     cube.show();
 }
 
-void TextScroll::start(const char* text, uint32_t now) {
+void TextScroll::start(const char* text, uint32_t now, uint32_t color) {
+    _color = color;
     strncpy(_text, text, sizeof(_text) - 1);
     _text[sizeof(_text) - 1] = '\0';
     _len = (int)strlen(_text);

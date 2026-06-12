@@ -2,9 +2,19 @@
 #include <Adafruit_NeoPixel.h>
 
 constexpr uint8_t  CUBE_X = 6;
-constexpr uint8_t  CUBE_Y = 3;  // height (layers) — set to 6 for full cube, 1 for single-layer testing
+constexpr uint8_t  CUBE_Y = 6;  // height (layers) — set to 6 for full cube, 1 for single-layer testing
 constexpr uint8_t  CUBE_Z = 6;
 constexpr uint16_t CUBE_LEDS = CUBE_X * CUBE_Y * CUBE_Z;
+
+// ── Dead-LED workaround ──────────────────────────────────────────────────────
+// The first LED in the chain — logical index 0, the (0,0,0) corner — had its
+// DIN pin break. The ESP32 data line is now wired straight to the SECOND LED, so
+// the physical chain begins at what the cube logic calls index 1. We shift every
+// write down by one: logical index 1 becomes the first pixel clocked out, and
+// index 0 is dropped (that corner stays dark). All modes address LEDs through
+// Cube::setPixel(), so applying the shift there fixes the whole mapping at once.
+// Set back to 0 once the broken LED is repaired or replaced.
+constexpr int LED_INDEX_OFFSET = -1;
 
 // ── Power budget — limited by the ESP32 dev board, not the LEDs ──────────────
 //

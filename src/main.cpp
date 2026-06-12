@@ -7,10 +7,11 @@
 #include "modes/ModeRipple.h"
 #include "modes/ModeComet.h"
 #include "modes/ModeSpiral.h"
-#include "modes/ModeBounce.h"
 #include "modes/ModeBounce3D.h"
 #include "modes/ModePlane.h"
 #include "modes/ModeSurface.h"
+#include "modes/ModeRain.h"
+#include "modes/ModeTetris.h"
 
 #define DATA_PIN 14
 #define CONTROL_BUTTON_PIN 34
@@ -26,14 +27,15 @@ ModeBreath modeBreath;
 ModeRipple modeRipple;
 ModeComet modeComet;
 ModeSpiral modeSpiral;
-ModeBounce modeBounce;
 ModeBounce3D modeBounce3D;
 ModePlane modePlane;
 ModeSurface modeSurface;
+ModeRain modeRain;
+ModeTetris modeTetris;
 
-Mode* modes[] = { &modeRipple, &modeSpiral, &modeComet,
-                  &modeBounce, &modeBounce3D, &modePlane, &modeSurface,
-                  &modeRainbow, &modeBreath };
+Mode* modes[] = { &modeTetris, &modeRipple, &modeSpiral, &modeComet,
+                  &modeBounce3D, &modePlane, &modeSurface,
+                  &modeRain, &modeRainbow, &modeBreath };
 constexpr int NUM_MODES = sizeof(modes) / sizeof(modes[0]);
 
 Preferences prefs;
@@ -58,10 +60,12 @@ void setMode(int index) {
     modeIndex = index % NUM_MODES;
     currentMode = modes[modeIndex];
     prefs.putInt("mode", modeIndex);
-    // show the mode label; the mode itself starts once it finishes
+    // show the mode label; the mode itself starts once it finishes.
+    // give each mode its own hue, evenly spread around the colour wheel.
     char label[8];
     snprintf(label, sizeof(label), "%d", modeIndex + 1);  // 1-based for display
-    modeLabel.start(label, millis());
+    uint16_t hue = (uint32_t)modeIndex * 65536UL / NUM_MODES;
+    modeLabel.start(label, millis(), Cube::colorHSV(hue));
     modePending = true;
 }
 
@@ -89,7 +93,7 @@ void setup() {
     controlButton.lastState = digitalRead(CONTROL_BUTTON_PIN);
     bootButton.lastState = digitalRead(BOOT_BUTTON_PIN);
     cube.begin();
-    cube.setBrightness(50);
+    cube.setBrightness(10);
     bool prefsOk = prefs.begin("led-cube", false);
     int savedMode = prefs.getInt("mode", INITIAL_MODE);
     Serial.printf("prefs open: %s, saved mode: %d\n", prefsOk ? "ok" : "FAILED", savedMode);
@@ -99,7 +103,7 @@ void setup() {
 void loop() {
     uint32_t now = millis();
 
-    if (wasPressed(controlButton, now) || wasPressed(bootButton, now)) {
+    if (wasPressed(bootButton, now)) {
         setMode(modeIndex + 1);
         Serial.printf("mode -> %d\n", modeIndex);
     }

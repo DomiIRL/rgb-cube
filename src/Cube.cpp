@@ -90,13 +90,19 @@ void Cube::setBrightness(uint8_t brightness) {
 void Cube::setPixel(int x, int y, int z, uint32_t color) {
     int index = coordToIndex(x, y, z);
     if (index >= 0) {
-        _strip.setPixelColor(index, color);
+        index += LED_INDEX_OFFSET;        // shift past the dead head LED
+        if (index >= 0) {
+            _strip.setPixelColor(index, color);
+        }
     }
 }
 
 void Cube::setPixel(int index, uint32_t color) {
     if (index >= 0) {
-        _strip.setPixelColor(index, color);
+        index += LED_INDEX_OFFSET;        // shift past the dead head LED
+        if (index >= 0) {
+            _strip.setPixelColor(index, color);
+        }
     }
 }
 
