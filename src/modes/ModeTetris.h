@@ -9,9 +9,12 @@
 // Legit Tetris, played by the cube itself. The seven tetrominoes fall in their
 // iconic colours (I-cyan, O-yellow, T-purple, S-green, Z-red, J-blue, L-orange),
 // rotate in FULL 3D (they can lie flat OR stand upright), and land by real
-// gravity/collision. A horizontal 6x6 layer clears ONLY when it is genuinely,
-// completely full — then it flashes white and the stack above collapses into the
-// gap. Nothing is ever force-cleared.
+// gravity/collision. Full 6x6 layers are NOT cleared the instant they fill — the
+// stack builds up until several full layers have stacked (an organic per-round
+// mix of 1/2/3/4, weighted to 3), then they all flash white together and the
+// stack above collapses into the gap. A safety clear fires if the stack nears
+// the ceiling with full layers waiting, so it rarely tops out. No layer is ever
+// force-cleared before it is genuinely, completely full.
 //
 // A greedy bot places each piece using an El-Tetris-style score: take real
 // clears, never bury holes, keep the stack low and flat. Standing pieces let it
@@ -35,6 +38,7 @@ public:
         generateOrients();
         resetGrid();
         _shimmer = 0.0f;
+        _clearTarget = pickClearTarget();
         _bagPos  = NUM_PIECES;   // force a fresh shuffle on the first spawn
         _phase   = PH_SPAWN;
         _phaseT  = 0;
@@ -227,6 +231,17 @@ private:
         return _bag[_bagPos++];
     }
 
+    // Pick the next clear-depth goal. Organic weighting: mostly 3, some 2 & 4,
+    // an occasional single — the stack builds up to this many full layers before
+    // clearing them together in one flash.
+    static int pickClearTarget() {
+        int r = random(0, 20);
+        if (r < 2)  return 1;   // 10% — occasional single, keeps it organic
+        if (r < 6)  return 2;   // 20%
+        if (r < 16) return 3;   // 50% — the usual satisfying triple
+        return 4;               // 20% — hold out for the big four-layer clear
+    }
+
     // ── phases ──────────────────────────────────────────────────────────
 
     // Pick the next piece and the best legal landing for it (greedy heuristic).
@@ -290,7 +305,18 @@ private:
         _phaseT += _frameMs;
         if (_phaseT >= LOCK_MS) {
             detectClears();
-            _phase = (_clearCount > 0) ? PH_FLASH : PH_SPAWN;
+            int maxh = 0;
+            for (int x = 0; x < CUBE_X; x++)
+                for (int z = 0; z < CUBE_Z; z++) {
+                    int h = colHeight(x, z);
+                    if (h > maxh) maxh = h;
+                }
+            // Hold the clear until enough full layers have stacked (the target),
+            // so clears land high and thick. Safety valve: if the stack is one
+            // layer from the ceiling with anything full, clear now to stay alive.
+            bool clearNow = (_clearCount >= _clearTarget) ||
+                            (_clearCount > 0 && maxh >= CUBE_Y - 1);
+            _phase = clearNow ? PH_FLASH : PH_SPAWN;
             _phaseT = 0;
         }
     }
@@ -303,12 +329,13 @@ private:
         if (_phaseT >= COLLAPSE_MS) {
             resetGrid();
             for (int i = 0; i < _mcCount; i++) _cell[_mc[i].x][_mc[i].toY][_mc[i].z] = _mc[i].color;
+            _clearTarget = pickClearTarget();
             _phase = PH_SPAWN; _phaseT = 0;
         }
     }
     void stepGameOver() {
         _phaseT += _frameMs;
-        if (_phaseT >= GAMEOVER_MS) { resetGrid(); _phase = PH_SPAWN; _phaseT = 0; }
+        if (_phaseT >= GAMEOVER_MS) { resetGrid(); _clearTarget = pickClearTarget(); _phase = PH_SPAWN; _phaseT = 0; }
     }
 
     void detectClears() {
@@ -461,6 +488,7 @@ private:
 
     bool     _clearPlane[CUBE_Y];
     int      _clearCount = 0;
+    int      _clearTarget = 3;   // full layers to stack before clearing (organic 1–4)
 
     struct MovingCell { uint8_t x, z, fromY, toY, color; };
     MovingCell _mc[CUBE_LEDS];
