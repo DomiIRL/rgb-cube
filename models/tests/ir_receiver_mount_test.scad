@@ -1,55 +1,54 @@
 // ============================================================
-// IR Receiver Mount — Fit Test (v2, measured board)
+// IR Receiver Mount — Fit Test (v3, SLIDE-IN tray)
 //
-// Holds the Elegoo IR receiver board flat in a GAP below the enclosure top
-// plate. The TSOP head (⌀12, 10 mm tall) pokes UP through a hole and out a
-// little; the 3 pins (5 mm, SAME side as the head) point up into the gap and
-// clear the ceiling. Board hangs in the gap because head + pins share a face.
+// Fixes v2's problems: the head was captive in a round hole (couldn't slide)
+// and the snap-lips were a press-fit too tight to insert or remove in PLA.
 //
-// MEASURED (2026-06-12): board 20 × 15 × 1.0, head ⌀12 (r6) × 10 tall, pins
-// 5 tall on the same side as the head, overhanging a 15 mm edge by 4 mm.
-// Head: centred across the 15 mm width; along the 20 mm length it sits 11 mm
-// from the no-pin edge / 9 mm from the pin edge → centre +1 mm toward pins.
-// (Your 5 mm = gap to the head's near edge; 9.5 mm = to the head centre.)
+// v3 is a SLIDE-IN tray — NO flexing, NO press-fit:
+//   • The board slides in flat from the +X (mouth) end, pins/wires trailing.
+//   • A groove on each long side captures the board edges in Z (can't drop
+//     out), so it just slides — in to mount, back out to remove.
+//   • The round head hole becomes a CHANNEL (slot) the TSOP head rides along.
+//     The slot's closed −X end is the stop that locates the head at its seat.
+//   • Board still hangs in a 6 mm gap below the plate so the 10 mm head pokes
+//     through (and ~1.5 mm out) while the 5 mm pins clear the plate.
 //
-// ---- Geometry trade-off (set by `gap`) ----
-//   head poke-out  = head_h − gap − ceil_t   (gap 6 → 1.5 mm out)
-//   pin clearance  = gap − pin_h             (gap 6 → 1.0 mm below ceiling)
-// Bigger gap = more pin/wire room but less poke-out (head_h−ceil_t = 7.5 max).
+// MEASURED (2026-06-12): board 20 × 15 × 1.0; head ⌀12 (r6) × 10 tall; pins
+// 5 tall, same face as the head, overhanging a 15 mm edge by 4 mm. Head is
+// centred across the width and 11 mm from the no-pin edge (→ seats at +1 X).
 //
 // ---- Print ----
 // PLA, 0.2 mm layer, 2 walls, 15% infill, NO supports.
-// Orientation: plate flat on bed, cradle UP (real top-plate orientation,
-// exterior face down). The head hole pokes out the bottom — flip to view.
+// Orientation: plate flat on bed (exterior face down), tray walls UP. The
+// head channel pokes out the bottom — flip the piece over to view it.
 //
 // ---- How to test & report ----
-// 1. Drop the board in from the top, head over the round hole, pins/wires out
-//    the OPEN end. It rests on the inner ledges; the 2 snap lips hold it down.
-// 2. Flip the piece: the head should poke out the flat face ~1.5 mm.
-// 3. The pins should hang ~1 mm above the plate's top (= the ceiling clearance).
-// Report: board fit (tight/loose)?  head aligned with hole?  poke-out amount?
-//         pins clear?  lips hold?
+// 1. Hold the board flat at the +X mouth, head DOWN, pins/wires hanging off
+//    the +X side. Slide it in (−X) until the head reaches the channel's
+//    closed end and stops. It should slide smoothly, not press.
+// 2. Flip the piece: the head should poke out the flat face ~1.5 mm, sitting
+//    in the round end of the channel.
+// 3. Slide it back out — should come free without prying.
+// Report: does it slide easily (too loose / too tight)?  does the head reach
+//         the channel end / poke out right?  do the pins clear?  held firmly
+//         enough, or does it need a detent so it can't slide back out?
 // ============================================================
 
 // ============================================================
 // PARAMETERS
 // ============================================================
 
-// ---- IR receiver PCB (MEASURED, except thickness) ----
-pcb_l = 20.0;   // mm — board length (X)
-pcb_w = 15.0;   // mm — board width (Y); pins overhang one 15 mm (short) edge
-pcb_t =  1.0;   // mm — board thickness (MEASURED)
-fit   =  0.4;   // mm — total clearance around PCB (0.2/side)
+// ---- IR receiver PCB (MEASURED) ----
+pcb_l = 20.0;   // mm — board length (X, slide axis)
+pcb_w = 15.0;   // mm — board width (Y)
+pcb_t =  1.0;   // mm — board thickness
 
 // ---- TSOP head / dome (MEASURED) ----
-head_d = 12.0;  // mm — head diameter (radius 6)
-head_h = 10.0;  // mm — head height above the PCB face
-head_cx = 1.0;  // mm — head centre X: +1 toward the pin (+X) edge (11mm/9mm)
-head_cy = 0.0;  // mm — head centre Y: centred across the width (MEASURED)
-head_hole_clear = 1.0;  // mm — added to head_d for the hole (→ ⌀13.0; also
-                        //      absorbs ~0.5 mm head-position uncertainty)
+head_d  = 12.0; // mm — head diameter (radius 6)
+head_h  = 10.0; // mm — head height above the PCB face
+head_cx =  1.0; // mm — head seat X: +1 toward the pin (+X) edge (11mm / 9mm)
 
-// ---- Pins (MEASURED) — same side as head, at the +X (15 mm) edge ----
+// ---- Pins (MEASURED) — same face as head, at the +X (15 mm) edge ----
 pin_h        = 5.0;  // mm — pin height above the PCB face
 pin_overhang = 4.0;  // mm — pins extend this far past the +X board edge
 
@@ -57,50 +56,70 @@ pin_overhang = 4.0;  // mm — pins extend this far past the +X board edge
 ceil_t = 2.5;   // mm — top-plate thickness (= floor_t in the enclosure)
 
 // ---- Mount gap (board face below the ceiling interior) ----
-gap = 6.0;      // mm — sets poke-out (1.5) and pin clearance (1.0)
+gap = 6.0;      // mm — head pokes out (head_h−gap−ceil_t)=1.5, pins clear=1.0
 
-// ---- Cradle ----
-wall    = 2.0;  // mm — wall thickness
-ledge   = 1.0;  // mm — inward rest ledge the board sits on
-lip     = 1.0;  // mm — snap-lip inward overhang
-lip_h   = 1.2;  // mm — snap-lip thickness (Z)
-lip_len = 8.0;  // mm — snap-lip length along the board
-border  = 5.0;  // mm — flat plate margin
+// ---- Slide tray / groove ----
+slide_fit  = 0.4;  // mm — clearance along the slide (X) and across (Y)
+slide_z    = 0.3;  // mm — vertical slack so the board slides freely
+groove     = 1.2;  // mm — how far each side groove grips the board edge (Y)
+rail_t     = 1.2;  // mm — thickness of the groove's upper lip (Z)
+wall       = 2.0;  // mm — outer wall thickness
+head_clear = 0.6;  // mm — radial clearance added to the head channel
+border     = 5.0;  // mm — flat plate margin (back & sides; mouth is flush)
 
 eps = 0.01;
 
 // ============================================================
 // DERIVED
 // ============================================================
-pocket_l = pcb_l + fit;            // 20.4
-pocket_w = pcb_w + fit;            // 15.4
-outer_l  = pocket_l + 2*wall;      // 24.4
-outer_w  = pocket_w + 2*wall;      // 19.4
-rest_z   = ceil_t + gap;           // 8.5 — board head-side face rests here
-top_z    = rest_z + pcb_t + lip_h; // 11.3 — cradle top
-hole_d   = head_d + head_hole_clear;          // 12.6
-plate_l  = pcb_l + 2*pin_overhang + 2*border; // 38
-plate_w  = pcb_w + 2*wall + 2*border;         // 29
-poke_out = head_h - gap - ceil_t;  // 1.5 (info)
-pin_clear = gap - pin_h;           // 1.0 (info)
+pocket_w = pcb_w + slide_fit;        // 15.4 — tray inner width
+rail_in  = pocket_w/2 - groove;      // 6.5  — inner edge of the side rails
+rest_z   = ceil_t + gap;             // 8.5  — board lower face rests here
+groove_top = rest_z + pcb_t + slide_z; // 9.8 — underside of the upper lip
+tray_top = groove_top + rail_t;      // 11.0 — top of the tray
+head_r   = head_d/2 + head_clear;    // 6.6  — head channel radius
+
+back_x   = -pcb_l/2 - slide_fit/2;   // -10.2 — back wall inner face (−X stop)
+mouth_x  =  pcb_l/2 + slide_fit/2;   //  10.2 — open mouth (+X)
+outer_back = back_x - wall;          // -12.2
+outer_w  = pocket_w + 2*wall;        // 19.4
+
+// plate extents: borders on back/sides, flush at the mouth
+plate_x0 = outer_back - border;      // -17.2
+plate_x1 = mouth_x;                  //  10.2 (flush — board/pins slide out here)
+plate_y  = outer_w/2 + border;       //  14.8
+
+poke_out  = head_h - gap - ceil_t;   // 1.5 (info)
+pin_clear = gap - pin_h;             // 1.0 (info)
 
 // ============================================================
-// MODULE: cradle (U-shape, +X end open for pins/wires)
+// MODULE: head channel (2D) — stadium from the seat to past the mouth.
+// The closed −X round end (at head_cx) is the X-stop that locates the head.
 // ============================================================
-module cradle() {
+module head_channel() {
+    hull() {
+        translate([head_cx, 0]) circle(r=head_r, $fn=64);   // round seat (stop)
+        translate([mouth_x + head_r, 0]) circle(r=head_r, $fn=64); // open at mouth
+    }
+}
+
+// ============================================================
+// MODULE: slide tray — side walls + a capture groove down each long side,
+// open at the +X mouth, closed by a back wall at −X.
+// ============================================================
+module tray() {
     difference() {
-        // outer box
-        translate([-outer_l/2, -outer_w/2, ceil_t])
-            cube([outer_l, outer_w, top_z - ceil_t]);
-        // upper pocket — board drops in (z >= rest_z)
-        translate([-pocket_l/2, -pocket_w/2, rest_z])
-            cube([pocket_l, pocket_w, top_z - rest_z + eps]);
-        // lower cavity — head passes through (z ceil_t..rest_z); ledge juts in
-        translate([-(pocket_l/2 - ledge), -(pocket_w/2 - ledge), ceil_t - eps])
-            cube([pocket_l - 2*ledge, pocket_w - 2*ledge, gap + 2*eps]);
-        // open the +X end (remove +X wall + ledge) for pins and wires
-        translate([pocket_l/2 - ledge, -outer_w, ceil_t - eps])
-            cube([outer_l, 2*outer_w, top_z - ceil_t + 2*eps]);
+        // solid block spanning back wall → mouth, full tray height
+        translate([outer_back, -outer_w/2, ceil_t])
+            cube([mouth_x - outer_back, outer_w, tray_top - ceil_t]);
+
+        // central through-channel: board body + head + pins (open to mouth)
+        translate([back_x, -rail_in, ceil_t - eps])
+            cube([mouth_x - back_x + eps, 2*rail_in, tray_top - ceil_t + 2*eps]);
+
+        // side grooves the board edges slide into (carved between the rails)
+        translate([back_x, -pocket_w/2, rest_z])
+            cube([mouth_x - back_x + eps, pocket_w, groove_top - rest_z]);
     }
 }
 
@@ -109,31 +128,23 @@ module cradle() {
 // ============================================================
 difference() {
     union() {
-        // ceiling plate (a patch of the top plate; covers board + pin overhang)
-        translate([-plate_l/2, -plate_w/2, 0])
-            cube([plate_l, plate_w, ceil_t]);
-
-        cradle();
-
-        // snap lips on the two long walls (hold the board down on the ledges)
-        for (sy = [-1, 1]) {
-            yy = (sy > 0) ? pocket_w/2 - lip : -pocket_w/2;
-            translate([-lip_len/2, yy, rest_z + pcb_t])
-                cube([lip_len, lip, lip_h]);
-        }
+        // ceiling plate (a patch of the enclosure top plate)
+        translate([plate_x0, -plate_y, 0])
+            cube([plate_x1 - plate_x0, 2*plate_y, ceil_t]);
+        tray();
     }
-
-    // head hole through the plate
-    translate([head_cx, head_cy, -eps])
-        cylinder(d=hole_d, h=ceil_t + 2*eps, $fn=64);
+    // head channel through the plate
+    translate([0, 0, -eps])
+        linear_extrude(height = ceil_t + 2*eps)
+            head_channel();
 }
 
 // ============================================================
-// KEY DIMENSIONS  (v2 — measured board)
-// plate        : 38 × 29 × 2.5 mm, cradle to z=10.7 mm
-// board pocket : 20.4 × 15.4 mm (PCB 20 × 15 + 0.4 fit), thickness 1.0
-// head hole    : ⌀13.0 mm (head ⌀12 + 1.0), centre +1 mm toward pins
-// mount gap    : 6 mm  → head pokes out 1.5 mm, pins clear ceiling by 1.0 mm
-// pins         : 5 mm tall, 4 mm past the +X edge → +X cradle end left open
-// rest ledges  : 1 mm inward on −X / +Y / −Y; 2 snap lips on the long walls
+// KEY DIMENSIONS  (v3 — slide-in tray)
+// plate        : 27.4 × 29.6 × 2.5 mm, tray to z=11.0 mm
+// slide tray   : 15.4 mm inner width, board edges captured in 1.2 mm grooves
+// head channel : ⌀13.2 stadium, round end (seat/stop) at x=+1, open at mouth
+// mount gap    : 6 mm → head pokes out 1.5 mm, pins clear plate by 1.0 mm
+// insertion    : slide in flat from +X mouth; back wall at x=−10.2 (−X stop)
+// retention    : Z-capture by grooves (no flex); slides back out to remove
 // ============================================================
