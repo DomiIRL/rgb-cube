@@ -2,12 +2,12 @@
 #include <Preferences.h>
 #include "Cube.h"
 #include "Text.h"
+#include "modes/ModeWaves.h"
 #include "modes/ModeRainbow.h"
 #include "modes/ModeBreath.h"
 #include "modes/ModeRipple.h"
 #include "modes/ModeComet.h"
 #include "modes/ModeSpiral.h"
-#include "modes/ModeBounce3D.h"
 #include "modes/ModePlane.h"
 #include "modes/ModeSurface.h"
 #include "modes/ModeRain.h"
@@ -22,19 +22,20 @@ constexpr uint32_t DEBOUNCE_MS = 50;
 
 Cube cube(DATA_PIN);
 
+ModeWaves modeWaves;
 ModeRainbow modeRainbow;
 ModeBreath modeBreath;
 ModeRipple modeRipple;
 ModeComet modeComet;
 ModeSpiral modeSpiral;
-ModeBounce3D modeBounce3D;
 ModePlane modePlane;
 ModeSurface modeSurface;
 ModeRain modeRain;
 ModeTetris modeTetris;
 
-Mode* modes[] = { &modeTetris, &modeRipple, &modeSpiral, &modeComet,
-                  &modeBounce3D, &modePlane, &modeSurface,
+Mode* modes[] = { &modeWaves,
+                  &modeTetris, &modeRipple, &modeSpiral, &modeComet,
+                  &modePlane, &modeSurface,
                   &modeRain, &modeRainbow, &modeBreath };
 constexpr int NUM_MODES = sizeof(modes) / sizeof(modes[0]);
 
@@ -93,7 +94,7 @@ void setup() {
     controlButton.lastState = digitalRead(CONTROL_BUTTON_PIN);
     bootButton.lastState = digitalRead(BOOT_BUTTON_PIN);
     cube.begin();
-    cube.setBrightness(10);
+    cube.setBrightness(50);  // 80 =  ~4.1 A worst case (all-white) — safe on the ~5 A PD board
     bool prefsOk = prefs.begin("led-cube", false);
     int savedMode = prefs.getInt("mode", INITIAL_MODE);
     Serial.printf("prefs open: %s, saved mode: %d\n", prefsOk ? "ok" : "FAILED", savedMode);

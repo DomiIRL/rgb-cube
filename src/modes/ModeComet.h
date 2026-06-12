@@ -1,32 +1,48 @@
 #pragma once
 #include "../Mode.h"
 #include <Arduino.h>
+#include <math.h>
 #include <string.h>
 
-// A bright comet head that ricochets through the whole cube in 3D, leaving a
-// fading rainbow trail behind it in the volume. It steps one cell at a time and
-// bounces off all six walls; on each bounce it re-rolls a random direction —
-// each axis independently picks -1, 0 or +1 (the axis that hit keeps heading
-// inward) — so it never settles into a fixed repeating path and wanders the
-// whole volume: sometimes straight, sometimes along a face, sometimes diagonal.
-// (ModeBounce3D is the trail-less slow glide; this one streaks and bounces
-// faster.) The per-voxel trail is stored in a logical buffer and painted back
+// A glowing comet that flies through the cube under real bounce physics: its
+// position and velocity are tracked in floating point and it reflects off all
+// six walls exactly (angle in = angle out) at a constant speed — no gravity, no
+// drag, no energy loss, just an ideal elastic ball ricocheting around the box.
+//
+// The head is drawn with a small anti-aliased splat (a separable tent kernel):
+// the voxels around the float position light up so that their luminance-weighted
+// centroid equals the true position, which is what makes the sub-cell location
+// read on the coarse 6x6x6 grid and lets the head glide smoothly between cells
+// instead of snapping from one to the next. That same footprint is blended into
+// a fading trail buffer, so the comet leaves a tail behind it. The head holds
+// one colour while it flies and jumps to a new hue only when it collides with a
+// wall, so each straight run between bounces is a solid colour with the colour
+// breaks falling exactly at the bounce points.
+//
+// This single mode replaces the two it was merged from: the old ModeComet had a
+// trail but re-rolled a random direction on each bounce (unphysical) and only a
+// crisp one-voxel head, and ModeBounce3D had the exact reflection physics and
+// the soft sphere but no trail. The trail buffer is logical and painted back
 // through cube.setPixel(x,y,z,...) so it follows the serpentine wiring.
 class ModeComet : public Mode {
 public:
-    explicit ModeComet(uint32_t stepMs = 70, uint8_t fade = 40)
-        : _stepMs(stepMs), _lastMs(0), _fade(fade) {
+    explicit ModeComet(uint32_t stepMs = 33, uint8_t fade = 6, float radius = 1.3f,
+                       float gamma = 2.2f)
+        : _stepMs(stepMs), _lastMs(0), _fade(fade), _radius(radius), _gamma(gamma) {
     }
 
     void onEnter(Cube& cube) override {
         memset(_val, 0, sizeof(_val));
         memset(_hue, 0, sizeof(_hue));
-        _x = random(0, CUBE_X);
-        _y = random(0, CUBE_Y);
-        _z = random(0, CUBE_Z);
-        _dx = randSign();
-        _dy = (CUBE_Y > 1) ? randSign() : 0;   // hold still in y when running a single layer
-        _dz = randSign();
+        // start near the centre with uneven velocities so the elastic path does
+        // not collapse into a short repeating loop. Constant speed: these are
+        // never scaled, only sign-flipped on a bounce.
+        _px = (CUBE_X - 1) * 0.5f;
+        _py = (CUBE_Y - 1) * 0.5f;
+        _pz = (CUBE_Z - 1) * 0.5f;
+        _vx = 0.070f;
+        _vy = (CUBE_Y > 1) ? 0.045f : 0.0f;   // hold still in y when running a single layer
+        _vz = 0.090f;
         _hueBase = 0;
         cube.clear();
         cube.show();
@@ -38,38 +54,60 @@ public:
         }
         _lastMs = ms;
 
-        // fade the whole trail
+        // fade the whole trail one notch
         for (int i = 0; i < CUBE_LEDS; i++) {
             _val[i] = (_val[i] > _fade) ? _val[i] - _fade : 0;
         }
 
-        // advance the head and bounce off the walls. On ANY bounce, re-roll a
-        // fresh direction for every axis (each independently steps -1, 0 or +1).
-        // Re-rolling all axes — not just the ones that missed a wall — is what
-        // breaks the corner-to-corner trap: at a corner all three axes bounce,
-        // and the old code would just flip to the opposite diagonal forever. An
-        // axis that hit a wall may only rest or head back inward (never straight
-        // back into the wall), and a guard keeps at least one axis moving.
-        int hx = bounce(_x, _dx, CUBE_X);
-        int hy = bounce(_y, _dy, CUBE_Y);
-        int hz = bounce(_z, _dz, CUBE_Z);
-        if (hx || hy || hz) {
-            _dx = chooseDir(hx, CUBE_X);
-            _dy = chooseDir(hy, CUBE_Y);
-            _dz = chooseDir(hz, CUBE_Z);
-            if (_dx == 0 && _dy == 0 && _dz == 0) {   // never freeze in place
-                if      (hx) _dx = hx;
-                else if (hz) _dz = hz;
-                else if (hy) _dy = hy;
-            }
+        // advance the head and reflect off the six walls at constant speed.
+        // use | (not ||) so every axis is stepped even if an earlier one bounced.
+        bool bounced = reflect(_px, _vx, CUBE_X)
+                     | reflect(_py, _vy, CUBE_Y)
+                     | reflect(_pz, _vz, CUBE_Z);
+        // change colour only on a wall collision; a golden-angle hop keeps
+        // consecutive bounce colours distinct. Between bounces the hue is held,
+        // so the head and the trail it lays down stay a single solid colour.
+        if (bounced) {
+            _hueBase += 40503;
         }
 
-        _hueBase += 1500;
-
-        // light the single head voxel at full brightness
-        int head = bufIndex(_x, _y, _z);
-        _val[head] = 255;
-        _hue[head] = _hueBase;
+        // stamp the head with a SEPARABLE TENT kernel: per-axis linear weight
+        // (1 at the centre, falling to 0 at +/- radius), the three multiplied
+        // together. Two properties of this kernel are what kill the "teleporting"
+        // look on a 6-wide grid: the luminance-weighted centroid of the lit
+        // voxels equals the true float position exactly (so the head never sticks
+        // to the nearest cell and then snaps to the next), and the total light
+        // stays ~constant as it crosses a cell boundary (so it doesn't dim and
+        // flicker mid-step). The old radial *squared* falloff broke both. max-
+        // blend keeps the brighter of the fresh head and the fading trail, and a
+        // voxel the head freshly lights takes the current hue, so the tail keeps
+        // the colour the head wore when it passed.
+        int x0 = clampLo(_px - _radius), x1 = clampHi(_px + _radius, CUBE_X);
+        int y0 = clampLo(_py - _radius), y1 = clampHi(_py + _radius, CUBE_Y);
+        int z0 = clampLo(_pz - _radius), z1 = clampHi(_pz + _radius, CUBE_Z);
+        for (int y = y0; y <= y1; y++) {
+            float wy = 1.0f - fabsf(y - _py) / _radius;
+            if (wy <= 0.0f) continue;
+            for (int z = z0; z <= z1; z++) {
+                float wz = 1.0f - fabsf(z - _pz) / _radius;
+                if (wz <= 0.0f) continue;
+                for (int x = x0; x <= x1; x++) {
+                    float wx = 1.0f - fabsf(x - _px) / _radius;
+                    if (wx <= 0.0f) continue;
+                    // gamma-encode the linear tent weight so that *perceived*
+                    // brightness ramps linearly as the head nears a voxel instead
+                    // of snapping on. The eye's response to LED PWM is roughly
+                    // value^(1/gamma), so pre-raising the weight to _gamma makes
+                    // perceived brightness ~proportional to the tent weight.
+                    uint8_t bv = (uint8_t)(powf(wx * wy * wz, _gamma) * 255.0f);
+                    int i = bufIndex(x, y, z);
+                    if (bv > _val[i]) {
+                        _val[i] = bv;
+                        _hue[i] = _hueBase;
+                    }
+                }
+            }
+        }
 
         // repaint the volume from the trail buffer (3-arg setPixel = serpentine-correct)
         for (int y = 0; y < CUBE_Y; y++) {
@@ -89,37 +127,35 @@ private:
         return (y * CUBE_Z + z) * CUBE_X + x;
     }
 
-    // step one axis, reflecting off the [0, n-1] walls. Returns 0 if no wall was
-    // hit, +1 if it hit the low wall (inward is now +1), -1 if it hit the high
-    // wall (inward is now -1). A single-cell axis (n <= 1) never moves.
-    static int bounce(int& p, int& d, int n) {
-        if (n <= 1) { d = 0; return 0; }
-        p += d;
-        if (p < 0)   { p = 1;     d = 1;  return +1; }
-        if (p >= n)  { p = n - 2; d = -1; return -1; }
-        return 0;
+    // advance one axis by its (constant-magnitude) velocity, reflecting off the
+    // [0, n-1] walls. Returns true if it bounced off a wall this step. A
+    // single-cell axis (n <= 1) never moves and never bounces.
+    static bool reflect(float& p, float& v, int n) {
+        if (n <= 1) { v = 0.0f; return false; }
+        p += v;
+        bool bounced = false;
+        if (p < 0.0f)           { p = -p;                  v = -v; bounced = true; }
+        if (p > (float)(n - 1)) { p = 2.0f * (n - 1) - p;  v = -v; bounced = true; }
+        return bounced;
     }
 
-    // pick a new step for one axis after a bounce. A free axis (hit == 0) may go
-    // -1, 0 or +1; an axis that just hit a wall may only rest (0) or head back
-    // inward, never straight back into the wall it just left.
-    static int chooseDir(int hit, int n) {
-        if (n <= 1)  return 0;
-        if (hit > 0) return random(0, 2) ? 1 : 0;    // hit low wall: +1 (inward) or rest
-        if (hit < 0) return random(0, 2) ? -1 : 0;   // hit high wall: -1 (inward) or rest
-        return random(0, 3) - 1;                      // free axis: -1, 0, or +1
+    static int clampLo(float f) {
+        int i = (int)floorf(f);
+        return i < 0 ? 0 : i;
     }
-
-    // random unit step, -1 or +1
-    static int randSign() {
-        return random(0, 2) ? 1 : -1;
+    static int clampHi(float f, int n) {
+        int i = (int)ceilf(f);
+        return i > n - 1 ? n - 1 : i;
     }
 
     uint32_t _stepMs;
     uint32_t _lastMs;
     uint8_t _fade;
+    float _radius;
+    float _gamma;    // perceptual gamma for the head's brightness falloff
     uint8_t _val[CUBE_LEDS];
     uint16_t _hue[CUBE_LEDS];
-    int _x, _y, _z, _dx, _dy, _dz;
+    float _px, _py, _pz;
+    float _vx, _vy, _vz;
     uint16_t _hueBase;
 };
