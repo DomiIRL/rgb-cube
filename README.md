@@ -42,9 +42,6 @@ PlatformIO project (`esp32dev` env, Arduino framework, Adafruit NeoPixel).
 A hardware button cycles through animation modes; the active mode is persisted
 in NVS across reboots.
 
-**Animation modes:** Breath, Comet, Plane, Rain, Rainbow, Ripple, Spiral,
-Surface, Tetris, Waves — one header-only mode each in `code/src/modes/`.
-
 **Build & flash** (easiest via the VSCode PlatformIO extension):
 
 ```bash
