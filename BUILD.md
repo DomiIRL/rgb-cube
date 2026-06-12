@@ -19,9 +19,10 @@ Hardware, geometry, enclosure and 3D-model specs live in **`CLAUDE.md`** — not
 - `platformio.ini` — env `esp32dev`, framework `arduino`, deps `Adafruit NeoPixel`, `IRremote`.
 - `src/main.cpp` — pins (DATA=14, control button=33, BOOT=0, IR receiver=34), the `modes[]`
   registry, BOOT-button + IR-remote control, brightness/speed/pause/blank/auto-cycle state, and
-  NVS persistence of the current mode. `handleIrCommand()` maps the full Elegoo NEC remote:
-  ▲/▼ next/prev mode, number keys (multi-digit, "1"+"0" = mode 10), `>>|`/`|<<` faster/slower,
-  VOL+/- brightness, EQ reset brightness, `>||` pause, Power blank, FUNC/STOP restart, ST/REPT
+  NVS persistence of all of them (`saveSettings()` writes mode+bright+speed+paused+display+cycle;
+  `setup()` restores them). `handleIrCommand()` maps the full Elegoo NEC remote: ▲/▼ next/prev
+  mode, number keys (multi-digit, "1"+"0" = mode 10), `>>|`/`|<<` faster/slower, VOL+/- brightness,
+  EQ factory reset (wipes NVS → defaults), `>||` pause, Power blank, FUNC/STOP restart, ST/REPT
   auto-cycle (cancelled by any manual mode change). Modes run on a speed-scaled virtual clock
   (`modeClock`), NOT real `millis()` — so speed/pause are global with no per-mode changes. Every
   decoded frame is logged via `printIRResultShort` for remapping. Power the receiver at

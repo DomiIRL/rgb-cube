@@ -34,7 +34,7 @@ constexpr uint8_t IR_NEXT      = 0x43;  // >>|        -> next mode
 constexpr uint8_t IR_DOWN      = 0x07;  // arrow down -> previous mode
 constexpr uint8_t IR_VOL_DOWN  = 0x15;  // VOL-       -> dimmer
 constexpr uint8_t IR_UP        = 0x09;  // arrow up   -> next mode
-constexpr uint8_t IR_EQ        = 0x19;  // EQ         -> reset brightness
+constexpr uint8_t IR_EQ        = 0x19;  // EQ         -> factory reset (all settings to defaults)
 constexpr uint8_t IR_ST_REPT   = 0x0D;  // ST/REPT    -> toggle auto-cycle
 constexpr uint8_t IR_0         = 0x16;  // number keys -> jump straight to a mode
 constexpr uint8_t IR_1         = 0x0C;
@@ -110,12 +110,23 @@ struct Button {
 Button controlButton = { CONTROL_BUTTON_PIN, HIGH, false, 0 };
 Button bootButton = { BOOT_BUTTON_PIN, HIGH, false, 0 };
 
+// Persist every user setting to NVS (setMode also calls this on manual mode changes).
+void saveSettings() {
+    prefs.putInt("mode", modeIndex);
+    prefs.putUChar("bright", brightness);
+    prefs.putFloat("speed", speed);
+    prefs.putBool("paused", paused);
+    prefs.putBool("display", displayOn);
+    prefs.putBool("cycle", autoCycle);
+}
+
 void applyBrightness(int value) {
     if (value < BRIGHT_MIN) value = BRIGHT_MIN;
     if (value > BRIGHT_MAX) value = BRIGHT_MAX;
     brightness = (uint8_t)value;
     cube.setBrightness(brightness);
     cube.show();   // re-scale the current frame so the change shows immediately
+    saveSettings();
     Serial.printf("brightness -> %d\n", brightness);
 }
 
@@ -123,6 +134,7 @@ void changeSpeed(float factor) {
     speed *= factor;
     if (speed < SPEED_MIN) speed = SPEED_MIN;
     if (speed > SPEED_MAX) speed = SPEED_MAX;
+    saveSettings();
     Serial.printf("speed -> %.2fx\n", speed);
 }
 
@@ -130,12 +142,13 @@ void setMode(int index, bool manual = true) {
     currentMode->onExit(cube);
     modeIndex = ((index % NUM_MODES) + NUM_MODES) % NUM_MODES;  // wrap; safe for negatives
     currentMode = modes[modeIndex];
-    prefs.putInt("mode", modeIndex);
     displayOn = true;          // any mode change wakes the display...
     paused = false;            // ...and resumes animation
     if (manual) autoCycle = false;  // a manual mode change stops auto-cycling
     lastCycleMs = millis();    // restart the auto-cycle clock
     typedNumber = 0;           // end any multi-digit entry (enterDigit re-sets it afterwards)
+    if (manual) saveSettings();                   // persist mode + the reset flags
+    else        prefs.putInt("mode", modeIndex);  // auto-cycle: only the mode changed
     // show the mode label; the mode itself starts once it finishes.
     // give each mode its own hue, evenly spread around the colour wheel.
     char label[8];
@@ -165,6 +178,16 @@ void enterDigit(int digit, uint32_t now) {
     }
 }
 
+// EQ button: wipe stored settings and return everything to defaults.
+void factoryReset() {
+    Serial.println("FACTORY RESET -> defaults");
+    prefs.clear();                 // erase the saved namespace
+    brightness = BRIGHT_DEFAULT;
+    speed      = 1.0f;
+    cube.setBrightness(brightness);
+    setMode(INITIAL_MODE);         // resets the flags and re-persists all defaults
+}
+
 // Map one decoded remote command to an action. Repeat frames are filtered upstream.
 void handleIrCommand(uint16_t cmd, uint32_t now) {
     switch (cmd) {
@@ -191,16 +214,18 @@ void handleIrCommand(uint16_t cmd, uint32_t now) {
         // brightness
         case IR_VOL_UP:   applyBrightness(brightness + BRIGHT_STEP); break;
         case IR_VOL_DOWN: applyBrightness(brightness - BRIGHT_STEP); break;
-        case IR_EQ:       applyBrightness(BRIGHT_DEFAULT); break;
+        case IR_EQ:       factoryReset(); break;   // wipe all settings -> defaults
 
         // power / playback
         case IR_POWER:
             displayOn = !displayOn;
             if (!displayOn) { cube.clear(); cube.show(); }
+            saveSettings();
             Serial.printf("display %s\n", displayOn ? "ON" : "OFF");
             break;
         case IR_PLAY:
             paused = !paused;
+            saveSettings();
             Serial.println(paused ? "paused" : "resumed");
             break;
         case IR_FUNC_STOP:
@@ -209,6 +234,7 @@ void handleIrCommand(uint16_t cmd, uint32_t now) {
         case IR_ST_REPT:
             autoCycle = !autoCycle;
             lastCycleMs = now;
+            saveSettings();
             Serial.printf("auto-cycle %s\n", autoCycle ? "ON" : "OFF");
             break;
 
@@ -246,11 +272,28 @@ void setup() {
     IrReceiver.printActiveIRProtocols(&Serial);
     Serial.println();
     cube.begin();
-    cube.setBrightness(brightness);  // BRIGHT_DEFAULT; VOL+/- adjust, EQ resets
-    bool prefsOk = prefs.begin("led-cube", false);
+
+    // restore all saved settings (defaults match the global initialisers)
+    bool prefsOk  = prefs.begin("led-cube", false);
     int savedMode = prefs.getInt("mode", INITIAL_MODE);
-    Serial.printf("prefs open: %s, saved mode: %d\n", prefsOk ? "ok" : "FAILED", savedMode);
-    setMode(savedMode);
+    brightness    = prefs.getUChar("bright", BRIGHT_DEFAULT);
+    speed         = prefs.getFloat("speed", 1.0f);
+    bool sPaused  = prefs.getBool("paused", false);
+    bool sDisplay = prefs.getBool("display", true);
+    bool sCycle   = prefs.getBool("cycle", false);
+    if (brightness < BRIGHT_MIN) brightness = BRIGHT_MIN;
+    if (brightness > BRIGHT_MAX) brightness = BRIGHT_MAX;
+    if (speed < SPEED_MIN) speed = SPEED_MIN;
+    if (speed > SPEED_MAX) speed = SPEED_MAX;
+    cube.setBrightness(brightness);
+    Serial.printf("prefs %s | mode %d bright %d speed %.2f paused %d display %d cycle %d\n",
+                  prefsOk ? "ok" : "FAILED", savedMode, brightness, speed, sPaused, sDisplay, sCycle);
+
+    setMode(savedMode, false);   // restore mode without resetting/over-persisting the flags
+    displayOn = sDisplay;        // ...then re-apply the saved flags that setMode forced
+    paused    = sPaused;
+    autoCycle = sCycle;
+    saveSettings();              // persist the fully-restored state
     lastRealMs = millis();
 }
 
