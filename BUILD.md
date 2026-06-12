@@ -33,10 +33,6 @@ Hardware, geometry, enclosure and 3D-model specs live in **`CLAUDE.md`** — not
   this, never index the strip directly), `setPixel(index,color)`, `clear()`, `show()`,
   `setBrightness(v)`. Colours: `Cube::colorRGB(r,g,b)` / `Cube::colorHSV(h,s,v)`, both packed
   as `(r<<16)|(g<<8)|b`.
-- **No software power cap** — the cube runs off the ~5 A USB-C PD board, so `Cube::show()` sends
-  the frame exactly as drawn (the old `capToBudget`/`estimateCurrentMa` machinery is gone). Just
-  repaint normally. The only ceiling is global brightness, set in `main.cpp::setup()` (now 50);
-  it bounds the worst case (all-white ≈ 216×60 mA × brightness/255).
 
 ## Add a new mode
 1. Create `src/modes/ModeX.h`: `#pragma once`, `#include "../Mode.h"`, subclass `Mode`.
