@@ -1,8 +1,10 @@
 # RGB Cube
 
 A **6×6×6 RGB LED matrix cube** (216 WS2812B-compatible LEDs) that plays 3D
-animations, driven by an ESP32. Built as a university project — firmware,
-3D-printable parts, and build notes all live in this repo.
+animations, driven by an ESP32. Firmware, 3D-printable parts, and build notes
+all live in this repo.
+
+> Built for the **"Rechnerarchitektur"** class at **Nordakademie**.
 
 > [!WARNING]
 > **The firmware is heavily "vibecoded."**
