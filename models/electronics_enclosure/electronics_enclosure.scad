@@ -39,6 +39,9 @@ lid_screw_depth = 12.0;  // mm — pilot depth (more = better thread engagement)
 // USB-C port cutout — back face (−Y), stadium profile (r = h/2)
 usbc_w  =  9.5;  // mm — port opening width
 usbc_h  =  3.5;  // mm — port opening height (USB-C connector ~2.56 mm + tolerance)
+// Measured on the real board (dry-fit): the TOP of the USB-C port sits this far
+// above the PCB's reference (bottom) face, which seats on the standoffs at board_z.
+usbc_port_top_above_board = 5.0;  // mm — measured top-of-port above PCB bottom
 
 // ESP32 DevKit V1 standoffs — centred at (+18, +15), clear of corners
 // Board: 51.5×28.6mm, 4× M3 holes ⌀3mm at 46.5×23.4mm spacing (source: mischianti.org)
@@ -72,7 +75,10 @@ ceil_z  = height - floor_t;  // 42.5 mm
 
 // Both boards hang from ceiling on standoffs of height esp_h
 board_z = ceil_z - esp_h;    // 37.5 mm — PCB surface height from Z=0
-usbc_z  = board_z + 2.0;     // 39.5 mm — USB-C port centre (adjust to board)
+// USB-C port centre: derive from the measured top-of-port, then drop half the
+// opening height. board_z(37.5) + 5.0 − 1.75 = 40.75 mm; top of opening = 42.5 mm
+// (flush with the inner ceiling — port sits as high as the cavity allows).
+usbc_z  = board_z + usbc_port_top_above_board - usbc_h/2;  // 40.75 mm
 
 // Corner fill screw hole: at the centroid of each triangular fill
 // centroid is corner_fill/3 inward from each wall face
@@ -209,7 +215,7 @@ if (part == "lid") {
 // corner fills    : 45°, 15mm leg, full-height — M3 pilot ⌀2.5 mm, 12mm deep
 // screw positions : ±62.5 mm from centre (corner centroid, = inner_w/2 − fill/3)
 // fixation holes  : ⌀3 mm at ±57 mm (inward from cube corners ±62.5 mm, clear of fills)
-// USB-C cutout    : 9.5 × 3.5 mm stadium (r=1.75 mm), back face, centre z≈39.5 mm
+// USB-C cutout    : 9.5 × 3.5 mm stadium (r=1.75 mm), back face, centre z=40.75 mm (top=42.5 mm)
 // ESP32 standoffs : 46.5×23.4 mm at (+18,+15), 5 mm, M3 (board holes ⌀3mm), boss ⌀4 mm
 // USB-C standoffs : 5 mm spacing at (0,−39.5), 5 mm, M2 (⌀3.5 mm boss, ⌀1.6 mm pilot)
 // board surface z : 37.5 mm (both boards level)

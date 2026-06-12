@@ -74,7 +74,7 @@ openscad -D 'part="lid"'  -o electronics_enclosure_lid.stl  electronics_enclosur
 | Corner filling (inner) | Solid 45° triangular prism, 15 mm leg, full-height — bonds to both walls + ceiling |
 | Lid screw holes | M3 pilot ⌀2.5 mm, 12 mm deep into each corner fill (self-tap in PLA) |
 | Cube fixation holes (×4) | ⌀3 mm at ±57 mm on top plate — inward from cube corners (±62.5 mm) to stay clear of corner fills |
-| USB-C port cutout | 9.5 × 4 mm on back face (−Y), centre z ≈ 39.5 mm — adjust `usbc_z` to exact board |
+| USB-C port cutout | 9.5 × 3.5 mm stadium on back face (−Y), centre z = 40.75 mm (top of opening flush with inner ceiling at 42.5 mm). Derived from measured `usbc_port_top_above_board` = 5 mm above PCB bottom face |
 | ESP32 standoffs (×4) | ⌀4 mm, M3 ⌀2.5 mm pilot, 5 mm tall, 46.5 × 23.4 mm pattern centred at (+18, +15) |
 | USB-C board standoffs (×2) | ⌀3.5 mm, M2 ⌀1.6 mm pilot, 5 mm tall, **5 mm spacing measured** |
 | Board surface height | 37.5 mm from bottom rim — both boards level |
