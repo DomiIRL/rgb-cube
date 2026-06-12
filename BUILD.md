@@ -16,10 +16,19 @@ Hardware, geometry, enclosure and 3D-model specs live in **`CLAUDE.md`** — not
   Arduino-macro collisions (see Gotchas), so stub the relevant macros if you rely on this.
 
 ## Layout (`code/`)
-- `platformio.ini` — env `esp32dev`, framework `arduino`, dep `Adafruit NeoPixel`.
-- `src/main.cpp` — pins (DATA=14, control button=34, BOOT=0), the `modes[]` registry,
-  button cycling, and NVS persistence of the current mode.
-- `src/Cube.{h,cpp}` — LED buffer + drawing API + automatic power cap.
+- `platformio.ini` — env `esp32dev`, framework `arduino`, deps `Adafruit NeoPixel`, `IRremote`.
+- `src/main.cpp` — pins (DATA=14, control button=33, BOOT=0, IR receiver=34), the `modes[]`
+  registry, BOOT-button + IR-remote control, brightness/speed/pause/blank/auto-cycle state, and
+  NVS persistence of the current mode. `handleIrCommand()` maps the full Elegoo NEC remote:
+  ▲/▼ next/prev mode, number keys (multi-digit, "1"+"0" = mode 10), `>>|`/`|<<` faster/slower,
+  VOL+/- brightness, EQ reset brightness, `>||` pause, Power blank, FUNC/STOP restart, ST/REPT
+  auto-cycle (cancelled by any manual mode change). Modes run on a speed-scaled virtual clock
+  (`modeClock`), NOT real `millis()` — so speed/pause are global with no per-mode changes. Every
+  decoded frame is logged via `printIRResultShort` for remapping. Power the receiver at
+  **3.3 V** (see CLAUDE.md). All IR protocol decoders are enabled (no `#define DECODE_NEC`).
+- `src/Cube.{h,cpp}` — LED buffer + drawing API. **No software power cap** (removed — the cube
+  runs off the USB-C PD board, not the ESP32 diode). Global brightness in `main.cpp`
+  (`BRIGHT_MAX` ≈ 80) is the only guard keeping a full-white frame under the ~5 A PD rating.
 - `src/Mode.h` — `Mode` base class.
 - `src/modes/Mode*.h` — one header-only mode per file.
 - `src/Text.{h,cpp}` — scrolling text used for mode labels.
@@ -28,7 +37,9 @@ Hardware, geometry, enclosure and 3D-model specs live in **`CLAUDE.md`** — not
 - Geometry: `CUBE_X/Y/Z = 6`, `CUBE_LEDS = 216`. **Y is up** — gravity is −Y, floor `y=0`,
   top `y=5`.
 - `class Mode`: override `void update(Cube&, uint32_t ms)`; optional `onEnter/onExit`.
-  Gate timing on `ms - _last >= stepMs`, repaint the frame, then call `cube.show()`.
+  Gate timing on `ms - _last >= stepMs`, repaint the frame, then call `cube.show()`. **`ms` is a
+  speed-scaled virtual clock (`main.cpp::modeClock`), not real `millis()`** — gate only on the
+  passed `ms` (never call `millis()` inside a mode) so the remote's speed/pause controls work.
 - `Cube`: `setPixel(x,y,z,color)` (serpentine wiring is handled inside — always go through
   this, never index the strip directly), `setPixel(index,color)`, `clear()`, `show()`,
   `setBrightness(v)`. Colours: `Cube::colorRGB(r,g,b)` / `Cube::colorHSV(h,s,v)`, both packed
@@ -46,6 +57,9 @@ Hardware, geometry, enclosure and 3D-model specs live in **`CLAUDE.md`** — not
   enum constants or variable names. (A bare `FALLING` enumerator once broke the Tetris-mode
   build — fixed by prefixing the phase enum `PH_*`.) A host `g++` check with a bare stub
   `Arduino.h` will NOT catch this; define the colliding macros in the stub to reproduce it.
+- **`<IRremote.hpp>` carries its own implementation — include it in exactly ONE translation
+  unit** (currently `main.cpp`). Including it from a second `.cpp` causes multiple-definition
+  link errors. `#define DECODE_NEC` before the include keeps it lean (NEC-only).
 
 ## Keep this file in sync
 A `SessionStart` hook (`.claude/settings.json`) points every session here. Whenever you change
