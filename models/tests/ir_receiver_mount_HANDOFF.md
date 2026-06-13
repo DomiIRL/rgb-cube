@@ -64,7 +64,7 @@ sits closest to. So at that end the head and the two holes are crowded together
 |---|---|
 | Test plate | 30 × 25 × 2.5 mm |
 | Standoffs | ⌀3.5 × 6 mm tall, M2 ⌀1.6 pilot, at **x = −7.5, y = ±5** (10 mm apart, 2.5 mm from the no-pin edge) |
-| Board fixing | 2× M2 self-tapping screws through the ⌀2 board holes into the pilots |
+| Board fixing | 2× M2 self-tapping screws through the ⌀2 board holes into the pilots — **fastening method confirmed by user 2026-06-13** |
 | Head hole | plain **round ⌀13.2** at (x = −1, y = 0), through the plate |
 | Mount gap | 6 mm → head pokes out **1.5 mm**, pins clear plate by **1.0 mm** |
 
@@ -102,8 +102,9 @@ PYOPENGL_PLATFORM=egl .venv/bin/python ~/.claude/skills/parametric-3d-printing/p
 1. **Standoff spacing/position** — do the two standoffs line up with the board's
    holes (10 mm apart, 2.5 mm from the no-pin edge, centred on width)? (tune
    `mh_pitch`, `mh_edge`)
-2. **Screw fit** — does an M2 self-tapping screw bite the ⌀1.6 pilot without
-   stripping or splitting the standoff? (tune `so_pilot`, `so_d`)
+2. **Screw fit** — M2 self-tap is the chosen method (confirmed 2026-06-13); does
+   the screw bite the ⌀1.6 pilot without stripping or splitting the standoff in
+   PLA? (tune `so_pilot`, `so_d`)
 3. **Standoff height / gap** — board sits level, head pokes ~1.5 mm, pins clear
    ~1 mm? (tune `gap`)
 4. **Head centred?** Is the round hole centred on the head when the board is
