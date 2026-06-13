@@ -1,16 +1,22 @@
 // ============================================================
-// IR Receiver Mount — Fit Test (v3, SLIDE-IN tray)
+// IR Receiver Mount — Fit Test (v4, SLIDE-IN tray + CLOSED head hole)
 //
-// Fixes v2's problems: the head was captive in a round hole (couldn't slide)
-// and the snap-lips were a press-fit too tight to insert or remove in PLA.
+// Changes from v3 (per user, 2026-06-13):
+//   • v3's board fit was TOO TIGHT — the PCB wouldn't slide in. Loosened:
+//     slide_fit 0.4→0.6, slide_z 0.3→0.5.
+//   • v3's head opening was a stadium slot OPEN at the +X (mouth) edge. The
+//     real enclosure top plate will have a CLOSED hole, so this test piece
+//     must replicate that. The head opening is now a CLOSED, stretched
+//     (stadium) hole fully surrounded by plate — still elongated along X so
+//     the head can be tilt-inserted at the +X end and slid to its seat.
 //
-// v3 is a SLIDE-IN tray — NO flexing, NO press-fit:
-//   • The board slides in flat from the +X (mouth) end, pins/wires trailing.
-//   • A groove on each long side captures the board edges in Z (can't drop
-//     out), so it just slides — in to mount, back out to remove.
-//   • The round head hole becomes a CHANNEL (slot) the TSOP head rides along.
-//     The slot's closed −X end is the stop that locates the head at its seat.
-//   • Board still hangs in a 6 mm gap below the plate so the 10 mm head pokes
+// Still a SLIDE-IN tray — NO flexing, NO press-fit:
+//   • A groove down each long side captures the board edges in Z (can't drop
+//     out); the board slides in to mount, back out to remove.
+//   • The CLOSED stadium head hole: its −X round end is the seat/stop that
+//     locates the head at X=+1; its +X round end is closed (a hole, like the
+//     case) but offset by `head_slide` so the head has room to enter + slide.
+//   • Board hangs in a 6 mm gap below the plate so the 10 mm head pokes
 //     through (and ~1.5 mm out) while the 5 mm pins clear the plate.
 //
 // MEASURED (2026-06-12): board 20 × 15 × 1.0; head ⌀12 (r6) × 10 tall; pins
@@ -20,18 +26,20 @@
 // ---- Print ----
 // PLA, 0.2 mm layer, 2 walls, 15% infill, NO supports.
 // Orientation: plate flat on bed (exterior face down), tray walls UP. The
-// head channel pokes out the bottom — flip the piece over to view it.
+// head hole pokes out the bottom — flip the piece over to view it.
 //
 // ---- How to test & report ----
-// 1. Hold the board flat at the +X mouth, head DOWN, pins/wires hanging off
-//    the +X side. Slide it in (−X) until the head reaches the channel's
-//    closed end and stops. It should slide smoothly, not press.
-// 2. Flip the piece: the head should poke out the flat face ~1.5 mm, sitting
-//    in the round end of the channel.
-// 3. Slide it back out — should come free without prying.
+// 1. From below/the mouth, tilt the board in: drop the head DOWN into the
+//    +X (open) end of the closed stadium hole, board edges entering the groove
+//    mouth, pins/wires trailing off the +X side. Then slide it in (−X) until
+//    the head reaches the hole's closed −X seat and stops. Should slide
+//    smoothly, not press.
+// 2. Flip the piece: the head should poke out the flat exterior face ~1.5 mm,
+//    sitting in the −X round seat of the now-CLOSED hole (no edge opening).
+// 3. Slide it back out (+X) and lift the head free — should come without prying.
 // Report: does it slide easily (too loose / too tight)?  does the head reach
-//         the channel end / poke out right?  do the pins clear?  held firmly
-//         enough, or does it need a detent so it can't slide back out?
+//         the seat / poke out right?  do the pins clear?  is the closed hole
+//         representative of what you want in the case top plate?
 // ============================================================
 
 // ============================================================
@@ -59,13 +67,18 @@ ceil_t = 2.5;   // mm — top-plate thickness (= floor_t in the enclosure)
 gap = 6.0;      // mm — head pokes out (head_h−gap−ceil_t)=1.5, pins clear=1.0
 
 // ---- Slide tray / groove ----
-slide_fit  = 0.4;  // mm — clearance along the slide (X) and across (Y)
-slide_z    = 0.3;  // mm — vertical slack so the board slides freely
+slide_fit  = 0.6;  // mm — clearance along the slide (X) and across (Y)  [v4: 0.4→0.6, was too tight]
+slide_z    = 0.5;  // mm — vertical slack so the board slides freely     [v4: 0.3→0.5, was too tight]
 groove     = 1.2;  // mm — how far each side groove grips the board edge (Y)
 rail_t     = 1.2;  // mm — thickness of the groove's upper lip (Z)
 wall       = 2.0;  // mm — outer wall thickness
-head_clear = 0.6;  // mm — radial clearance added to the head channel
-border     = 5.0;  // mm — flat plate margin (back & sides; mouth is flush)
+head_clear = 0.6;  // mm — radial clearance added to the head hole
+border     = 5.0;  // mm — flat plate margin (back & sides)
+
+// ---- Closed head hole (v4 — case replica, NOT open to the side) ----
+head_slide  = 5.0; // mm — +X stretch of the closed stadium hole: room to
+                   //      tilt the head in at the +X end, then slide to seat
+hole_margin = 3.0; // mm — min plate material around the hole's closed +X end
 
 eps = 0.01;
 
@@ -77,29 +90,35 @@ rail_in  = pocket_w/2 - groove;      // 6.5  — inner edge of the side rails
 rest_z   = ceil_t + gap;             // 8.5  — board lower face rests here
 groove_top = rest_z + pcb_t + slide_z; // 9.8 — underside of the upper lip
 tray_top = groove_top + rail_t;      // 11.0 — top of the tray
-head_r   = head_d/2 + head_clear;    // 6.6  — head channel radius
+head_r   = head_d/2 + head_clear;    // 6.6  — head hole radius
 
-back_x   = -pcb_l/2 - slide_fit/2;   // -10.2 — back wall inner face (−X stop)
-mouth_x  =  pcb_l/2 + slide_fit/2;   //  10.2 — open mouth (+X)
-outer_back = back_x - wall;          // -12.2
-outer_w  = pocket_w + 2*wall;        // 19.4
+back_x   = -pcb_l/2 - slide_fit/2;   // -10.3 — back wall inner face (−X stop)
+mouth_x  =  pcb_l/2 + slide_fit/2;   //  10.3 — open tray mouth (+X, board entry)
+outer_back = back_x - wall;          // -12.3
+outer_w  = pocket_w + 2*wall;        // 19.6
 
-// plate extents: borders on back/sides, flush at the mouth
-plate_x0 = outer_back - border;      // -17.2
-plate_x1 = mouth_x;                  //  10.2 (flush — board/pins slide out here)
-plate_y  = outer_w/2 + border;       //  14.8
+// closed head hole: −X seat at head_cx, +X end offset by head_slide (CLOSED)
+hole_x1  = head_cx + head_slide + head_r; // 12.6 — hole's +X outer extreme
+
+// plate extents: borders on back/sides; +X reaches past the closed hole so it
+// stays surrounded by plate (the case-replica hole, no edge opening)
+plate_x0 = outer_back - border;          // -17.3
+plate_x1 = max(mouth_x, hole_x1 + hole_margin); // 15.6 — encloses the +X hole end
+plate_y  = outer_w/2 + border;           //  14.8
 
 poke_out  = head_h - gap - ceil_t;   // 1.5 (info)
 pin_clear = gap - pin_h;             // 1.0 (info)
 
 // ============================================================
-// MODULE: head channel (2D) — stadium from the seat to past the mouth.
-// The closed −X round end (at head_cx) is the X-stop that locates the head.
+// MODULE: head hole (2D) — CLOSED stadium, both ends rounded, fully inside
+// the plate (replicates the case top-plate hole — NOT open to the edge).
+// The −X round end (at head_cx) is the seat/stop; the +X round end (offset by
+// head_slide) is the open-but-enclosed end the head tilts into before sliding.
 // ============================================================
 module head_channel() {
     hull() {
-        translate([head_cx, 0]) circle(r=head_r, $fn=64);   // round seat (stop)
-        translate([mouth_x + head_r, 0]) circle(r=head_r, $fn=64); // open at mouth
+        translate([head_cx, 0])              circle(r=head_r, $fn=64); // −X seat (stop)
+        translate([head_cx + head_slide, 0]) circle(r=head_r, $fn=64); // +X insertion end (CLOSED)
     }
 }
 
@@ -140,11 +159,13 @@ difference() {
 }
 
 // ============================================================
-// KEY DIMENSIONS  (v3 — slide-in tray)
-// plate        : 27.4 × 29.6 × 2.5 mm, tray to z=11.0 mm
-// slide tray   : 15.4 mm inner width, board edges captured in 1.2 mm grooves
-// head channel : ⌀13.2 stadium, round end (seat/stop) at x=+1, open at mouth
+// KEY DIMENSIONS  (v4 — slide-in tray + CLOSED head hole)
+// plate        : 32.9 × 29.6 × 2.5 mm, tray to z=11.2 mm
+// slide tray   : 15.6 mm inner width (slide_fit 0.6), edges in 1.2 mm grooves
+// head hole    : ⌀13.2 CLOSED stadium, −X seat/stop at x=+1, +X end at x=+6
+//                (closed, surrounded by plate — replicates the case hole)
 // mount gap    : 6 mm → head pokes out 1.5 mm, pins clear plate by 1.0 mm
-// insertion    : slide in flat from +X mouth; back wall at x=−10.2 (−X stop)
+// insertion    : tilt head into the +X hole end, slide −X to seat; back wall
+//                at x=−10.3 (−X stop). Looser than v3 (was too tight to slide)
 // retention    : Z-capture by grooves (no flex); slides back out to remove
 // ============================================================
